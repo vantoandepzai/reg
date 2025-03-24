@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ứng dụng Nhập Tệp</title>
+    <meta name="description" content="Ứng dụng đơn giản để nhập và xử lý tệp" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📁</text></svg>"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
+      rel="stylesheet"
+    />
+    <script src="https://unpkg.com/vue@3.5.13/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  </head>
+  <body class="bg-gray-100 min-h-screen flex items-center justify-center">
+    <div id="app" class="w-full max-w-md">
+      <div class="bg-white p-8 rounded-lg shadow-md border border-gray-200">
+        <h1 class="text-2xl font-bold text-center mb-6">Nhập TỆP</h1>
+
+        <div class="mb-6">
+          <div
+            class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-500 transition-colors"
+            :class="{'border-blue-500 bg-blue-50': isDragging || selectedFile}"
+            @dragover.prevent="isDragging = true"
+            @dragleave.prevent="isDragging = false"
+            @drop.prevent="onFileDrop"
+            @click="$refs.fileInput.click()"
+          >
+            <input
+              type="file"
+              ref="fileInput"
+              class="hidden"
+              @change="onFileSelected"
+            />
+
+            <div v-if="!selectedFile">
+              <svg
+                class="w-12 h-12 mx-auto text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                ></path>
+              </svg>
+              <p class="mt-2 text-sm text-gray-600">
+                Kéo và thả tệp vào đây hoặc nhấp để chọn
+              </p>
+              <p class="text-xs text-gray-500 mt-1">
+                Hỗ trợ tất cả các loại tệp
+              </p>
+            </div>
+
+            <div v-else class="text-left">
+              <div class="flex items-center">
+                <svg
+                  class="w-8 h-8 text-blue-500 mr-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  ></path>
+                </svg>
+                <div>
+                  <p class="font-medium text-gray-900">
+                    {{ selectedFile.name }}
+                  </p>
+                  <p class="text-sm text-gray-500">
+                    {{ formatFileSize(selectedFile.size) }}
+                  </p>
+                </div>
+                <button
+                  @click.stop="removeFile"
+                  class="ml-auto text-gray-400 hover:text-red-500"
+                >
+                  <svg
+                    class="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M6 18L18 6M6 6l12 12"
+                    ></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button
+          @click="uploadFile"
+          class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          :disabled="!selectedFile || isUploading"
+        >
+          <span v-if="isUploading" class="flex items-center justify-center">
+            <svg
+              class="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              ></circle>
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+            Đang xử lý...
+          </span>
+          <span v-else>Kích Hoạt</span>
+        </button>
+
+        <div
+          v-if="uploadStatus"
+          class="mt-4 p-3 rounded-md"
+          :class="statusClasses"
+        >
+          <p class="text-sm">{{ uploadStatus }}</p>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { SDK } from "https://webdraw.com/webdraw-sdk@v1";
+      import WebdrawTextarea from "https://assets.webdraw.app/vue/textarea.js";
+
+      const { createApp, ref, computed, onMounted } = Vue;
+
+      createApp({
+        components: { "webdraw-textarea": WebdrawTextarea },
+        setup() {
+          const fileInput = ref(null);
+          const selectedFile = ref(null);
+          const isDragging = ref(false);
+          const isUploading = ref(false);
+          const uploadStatus = ref("");
+          const statusType = ref(""); // 'success' or 'error'
+
+          const statusClasses = computed(() => {
+            return {
+              "bg-green-50 text-green-800 border border-green-200":
+                statusType.value === "success",
+              "bg-red-50 text-red-800 border border-red-200":
+                statusType.value === "error",
+            };
+          });
+
+          const onFileSelected = (event) => {
+            const files = event.target.files;
+            if (files.length > 0) {
+              selectedFile.value = files[0];
+              uploadStatus.value = "";
+            }
+          };
+
+          const onFileDrop = (event) => {
+            isDragging.value = false;
+            const files = event.dataTransfer.files;
+            if (files.length > 0) {
+              selectedFile.value = files[0];
+              uploadStatus.value = "";
+            }
+          };
+
+          const removeFile = () => {
+            selectedFile.value = null;
+            if (fileInput.value) {
+              fileInput.value.value = "";
+            }
+            uploadStatus.value = "";
+          };
+
+          const formatFileSize = (bytes) => {
+            if (bytes === 0) return "0 Bytes";
+            const k = 1024;
+            const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return (
+              parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
+            );
+          };
+
+          const uploadFile = async () => {
+            if (!selectedFile.value) return;
+
+            isUploading.value = true;
+            uploadStatus.value = "";
+
+            try {
+              // Simulate file upload with timeout
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+
+              // Success response
+              statusType.value = "success";
+              uploadStatus.value = `Tệp "${selectedFile.value.name}" đã được tải lên thành công!`;
+
+              // In a real application, you would use SDK here
+              // const sdk = SDK;
+              // Process the file with SDK...
+            } catch (error) {
+              statusType.value = "error";
+              uploadStatus.value = `Lỗi: ${
+                error.message || "Không thể tải lên tệp"
+              }`;
+              console.error("Upload error:", error);
+            } finally {
+              isUploading.value = false;
+            }
+          };
+
+          onMounted(() => {
+            // Initialize any SDK components if needed
+            // const sdk = SDK;
+          });
+
+          return {
+            fileInput,
+            selectedFile,
+            isDragging,
+            isUploading,
+            uploadStatus,
+            statusClasses,
+            onFileSelected,
+            onFileDrop,
+            removeFile,
+            formatFileSize,
+            uploadFile,
+          };
+        },
+      }).mount("#app");
+      //import script in file to buid
+      //com.dts.freefireth
+      //com.dts.freefiremax
+    </script>
+  </body>
+</html>
